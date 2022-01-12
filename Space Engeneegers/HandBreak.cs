@@ -24,61 +24,142 @@ namespace IngameScript
     {
         // --------------------------------------
 
+
+        static IMyGridTerminalSystem gts;
+        public string Status;
+        public int Tick = 0;
+        readonly string tag = "TrainStatusSender";
+        int _Tick;
+
+
+        MyIGCMessage message;
+        IMyBroadcastListener MessageListener;
+        IMyCockpit cockpit;
+        List<IMyThrust> thrustsF, thrustsB;
+        List<IMyTextPanel> tpanels;
+        List<IMyDoor> doors;
+
         public Program()
         {
-            
+            gts = GridTerminalSystem;
+            thrustsF = new List<IMyThrust>();
+            thrustsB = new List<IMyThrust>();
+            gts.GetBlocksOfType<IMyThrust>(thrustsF, (b) => b.CustomName.Contains("Forward"));
+            gts.GetBlocksOfType<IMyThrust>(thrustsB, (b) => b.CustomName.Contains("Backward"));
+            tpanels = new List<IMyTextPanel>();
+            gts.GetBlocksOfType<IMyTextPanel>(tpanels);
+            doors = new List<IMyDoor>();
+            gts.GetBlocksOfType<IMyDoor>(doors);
+            cockpit = gts.GetBlockWithName("Cockpit") as IMyCockpit;
+            MessageListener = IGC.RegisterBroadcastListener(tag);
+            message = new MyIGCMessage();
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Me.GetSurface(0).WriteText("TEST");
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
-            IMyCockpit cock;
-            cock = GridTerminalSystem.GetBlockWithName("Cock") as IMyCockpit;
-
-            IMyBlockGroup DoorGroup = GridTerminalSystem.GetBlockGroupWithName("T_Door");
-            List<IMyTerminalBlock> DoorList = new List<IMyTerminalBlock>();
-            DoorGroup.GetBlocks(DoorList);
-
-            foreach (var j in DoorList)
+            if (MessageListener.HasPendingMessage)
             {
-                if (argument == "start") j.ApplyAction("Open_Off");
-                if (argument == "stop") j.ApplyAction("Open_On");
+                message = MessageListener.AcceptMessage();
+                argument = message.Data.ToString();
+                Me.GetSurface(0).WriteText(argument);
+                
             }
-
-            IMyTextPanel LCD;
-            LCD = GridTerminalSystem.GetBlockWithName("T_LCD") as IMyTextPanel;
-            if (argument == "start") LCD.WriteText("СТАНЦИЯ НАЗНАЧЕНИЯ:\n НИЖНЕЗАПУПИНСК");
-            if (argument == "stop") LCD.WriteText("СТАНЦИЯ ОЖИДАНИЯ:\n НИЖНЕЗАПУПИНСК" +
-                "\nДО ОТПРАВКИ null МИНУТ");
-
-            IMyBlockGroup ThrustGroup = GridTerminalSystem.GetBlockGroupWithName("ENG");
-            if (ThrustGroup == null)
+            switch (argument)
             {
-                Echo("Not Found group!");
+                case "GoToA":
+                    //Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                    Status = "GTA";
+                    break;
+                case "GoToB":
+                    //Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                    Status = "GTB";
+                    break;
+                case "Stop":
+                    //Runtime.UpdateFrequency = UpdateFrequency.None;
+                    Status = "Arrived";
+                    Tick = 0;
+                    break;
             }
-
-            Echo($"{ThrustGroup.Name}:");
-            List<IMyTerminalBlock> ThrustList = new List<IMyTerminalBlock>();
-            ThrustGroup.GetBlocks(ThrustList);
-
-            foreach (var j in ThrustList)
+            if (Status == "GTB" || Status == "GTA")
             {
-                Echo($"- {j.CustomName} ");
-                if (argument == "start") {
-                    j.ApplyAction("OnOff_On");
-                    cock.ApplyAction("HandBrake");
+                Tick++;
+                _Tick = Tick;
+            }
+            TextPanelsInfo();
+            UpdateMov();
+        }
+
+        public void TextPanelsInfo()
+        {
+            foreach (IMyTextPanel lcd in  tpanels)
+            {
+                lcd.ContentType = ContentType.TEXT_AND_IMAGE;
+                lcd.FontSize = 1.2f;
+                lcd.TextPadding = 33f;
+                lcd.Alignment = TextAlignment.CENTER;
+                lcd.FontColor = Color.Green;
+                lcd.BackgroundColor = Color.Blue;
+                lcd.WriteText("ИнжеНегроКосмоТранс\n", false);
+                switch (Status)
+                {
+                    case "GTA":
+                        lcd.WriteText("Поезд движется на станцию А", true);
+                        break;
+                    case "GTB":
+                        lcd.WriteText("Поезд движется на станцию B", true);
+                        break;
+                    case "Arrived":
+                        lcd.WriteText(String.Format("Поезд прибыл на станцию.\n Путь занял {0} секунд.\nСпасибо за поездку.",(_Tick/60)), true);
+                        break;
                 }
-                if (argument == "stop") {
-                    cock.ApplyAction("HandBrake");
-                }
-            }
-            
-
-
-
-
-            {
-               // th.SetValueFloat("Override", 0);
             }
         }
+
+        public void UpdateMov()
+        {
+            switch (Status)
+            {
+                case "GTA":
+                    foreach (IMyThrust th in thrustsF)
+                    {
+                        th.ThrustOverridePercentage = 1f;
+                    }
+                    foreach (IMyDoor door in doors)
+                    {
+                        door.ApplyAction("Open_Off");
+                    }
+                    cockpit.HandBrake = false;
+                    break;
+                case "GTB":
+                    foreach (IMyThrust th in thrustsB)
+                    {
+                        th.ThrustOverridePercentage = 1f;
+                    }
+                    foreach (IMyDoor door in doors)
+                    {
+                        door.ApplyAction("Open_Off");
+                    }
+                    cockpit.HandBrake = false;
+                    break;
+                case "Arrived":
+                    foreach (IMyThrust th in thrustsB)
+                    {
+                        th.ThrustOverridePercentage = 0f;
+                    }
+                    foreach (IMyThrust th in thrustsF)
+                    {
+                        th.ThrustOverridePercentage = 0f;
+                    }
+                    foreach (IMyDoor door in doors)
+                    {
+                        door.ApplyAction("Open_On");
+                    }
+                    cockpit.HandBrake = true;
+                    break;
+            }
+        }
+
     }
 }
