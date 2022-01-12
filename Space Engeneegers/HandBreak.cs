@@ -23,6 +23,7 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         // --------------------------------------
+        // копировать от сюда
 
 
         static IMyGridTerminalSystem gts;
@@ -160,6 +161,8 @@ namespace IngameScript
                     break;
             }
         }
+
+        // и до сюда
 
     }
 }

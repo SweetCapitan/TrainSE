@@ -43,6 +43,7 @@ namespace IngameScript
         //
         // to learn more about ingame scripts.
 
+        // Копировать от сюда
 
         string tag = "TrainStatusSender";
         IMyTextPanel lcd;
@@ -74,6 +75,8 @@ namespace IngameScript
                     break;
             }
         }
+
+        // и до сюда
 
     }
 }
